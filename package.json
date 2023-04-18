@@ -1,0 +1,19 @@
+{
+  "name": "siwe",
+  "version": "1.0.0",
+  "description": "siwe",
+  "main": "server.js",
+  "repository": "https://github.com/naimanton/siwe",
+  "author": "",
+  "license": "MIT",
+  "private": false,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+  
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}
