@@ -860,7 +860,7 @@ class Server extends ServerHood {
 
   async listen() {
     try {
-      await fastify.listen(10000);
+      await fastify.listen({ port: 10000, host: '0.0.0.0' };
     } catch (err) {
       fastify.log.error(err);
       process.exit(1);
