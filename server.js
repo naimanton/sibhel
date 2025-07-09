@@ -12,9 +12,9 @@ if (!String.prototype.replaceAll) {
 const qw = console.log;
 const fs = require("fs");
 const ioredis = require("ioredis");
-const vigenere = require("/app/vigenere.js");
-const Siheca = require("/app/siheca.js");
-const Rebyanco = require("/app/rebyanco.js");
+const vigenere = require("/vigenere.js");
+const Siheca = require("/siheca.js");
+const Rebyanco = require("/rebyanco.js");
 const https = require("https");
 const Slimbot = require('slimbot');
 const fastify = require('fastify')({ logger: false });
@@ -670,9 +670,9 @@ class Server extends ServerHood {
     fastify.post('/update_products_string', this.handleSibzPartnerOrderProductsUpdating.bind(this));
     fastify.post('/siheca', this.handleSiheca.bind(this));
     fastify.post('/siheca2', this.handleSiheca2.bind(this));
-    fastify.post('/remains', this.handleRebyanco.bind(this));
+    // fastify.post('/remains', this.handleRebyanco.bind(this));
     // fastify.post('/product_movement', this.handleProductMovement.bind(this));
-    fastify.post('/saveOrder', this.handleOrderSaving.bind(this));
+    fastify.post('/saveOrder', this.handleBotSending.bind(this));
     // fastify.post('/askDates', this.handleDatesAsking.bind(this));
     // fastify.post('/askOrder', this.handleOrderAsking.bind(this));
     // fastify.post('/delOrder', this.handleOrderDeling.bind(this));
