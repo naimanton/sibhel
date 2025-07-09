@@ -15,7 +15,7 @@
     "ioredis": "5.x.x"
   },
   "engines": {
-    "node": "16.x"
+    "node": "20.x"
   },
   "repository": {
     "url": "https://github.com/naimanton/sibhel"
