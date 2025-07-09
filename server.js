@@ -11,13 +11,15 @@ if (!String.prototype.replaceAll) {
 
 const qw = console.log;
 const fs = require("fs");
+const ioredis = require("ioredis");
 const vigenere = require("/app/vigenere.js");
 const Siheca = require("/app/siheca.js");
 const Rebyanco = require("/app/rebyanco.js");
 const https = require("https");
-// const Slimbot = require('slimbot');
+const Slimbot = require('slimbot');
 const fastify = require('fastify')({ logger: false });
-// const tbot = new Slimbot(process.env.BOT_TOKEN);
+const tbot = new Slimbot(process.env.BOT_TOKEN);
+const redis = new ioredis.Redis(process.env.REDIS_URL)
 var KZ_OFFSET_MINUTES = -300;
 var chron = {
   getYearMonthDate() {
@@ -96,8 +98,12 @@ class ServerHood {
     return result;
   }
   
-  wfile(path, data) {
-    fs.writeFileSync(path, data);
+  async rDataFile(path) {
+    return await redis.get(path);
+  }
+
+  async wfile(path, data) { // now for redis
+    return await redis.set(path, data);
   }
   
   getUTCWithShift(shift=0) {
@@ -141,25 +147,19 @@ class ServerHood {
     );
   }
   
-  cookDataScriptByPath(path, type, name) {
-    let data = this.rfile(path);
+  async cookDataScriptByPath(path, type, name) {
+    let data = await this.rDataFile(path);
     return `${type} ${name} = \`${data}\``;
   }
   
-  cookDataScript(dataFunc, type, name) {
-    return `${type} ${name} = \`${dataFunc()}\``;
+  async cookDataScript(dataFunc, type, name) {
+    return `${type} ${name} = \`${await dataFunc()}\``;
   }
   
-  cookPartnerOrderInfo() {
-    const stateJSON = this.rfile.call(this, 'data/state.json');
+  async cookPartnerOrderInfo() {
+    const stateJSON = await this.rDatafile.call(this, 'data/state.json');
     const state = JSON.parse(stateJSON);
     return state.sibz.last_products_updating_day;
-  }
-  
-  cookPublicOrderInfo() {
-    const stateJSON = this.rfile.call(this, 'data/state.json');
-    const state = JSON.parse(stateJSON);
-    return state.sibz.last_public_products_updating_day;
   }
   
   _cleanStateSibz(today, state) {
@@ -176,12 +176,12 @@ class ServerHood {
     return state;
   }
   
-  handleSibzPartnerOrderProductsUpdating(request, reply) {
+  async handleSibzPartnerOrderProductsUpdating(request, reply) {
     let today = chron.getYearMonthDate();
     let today_attempts_key = today + "_products_updating_attempts"; 
     
     let body = JSON.parse(request.body);
-    let state = JSON.parse(this.rfile("data/state.json"));
+    let state = JSON.parse(await this.rDataFile("data/state.json"));
     state = this._cleanStateSibz.call(this, today, state)
     
     if (state.sibz[today_attempts_key] !== undefined) {
@@ -223,7 +223,7 @@ class ServerHood {
       reply.send("Ошибка. Возможно обновление уже выполнялось сегодня.");
     }
   }
-  handleSiheca(request, reply) {
+  async handleSiheca(request, reply) {
     if (this.isSihecaWorkingNow) {
       reply.send({message:"Обновление уже запущено из другого места, подождите."});
       return;
@@ -233,7 +233,7 @@ class ServerHood {
     let today_attempts_key = today + "_products_updating_attempts"; 
     
     let body = JSON.parse(request.body);
-    let state = JSON.parse(this.rfile("data/state.json"));
+    let state = JSON.parse(await this.rDataFile("data/state.json"));
     state = this._cleanStateSibz.call(this, today, state)
     
     if (state.sibz[today_attempts_key] !== undefined) {
@@ -335,14 +335,14 @@ class ServerHood {
         }  
       });
       siheca.run().then(
-        result => {
+        async (result) => {
           reply.send(
             {
               message: "Запрос выполнен.", 
               productsString: result
             }
           );
-          let state = JSON.parse(this.rfile("data/state.json"));
+          let state = JSON.parse(await this.rDataFile("data/state.json"));
           state[
             vigenere.cipher(
               true, 
@@ -403,14 +403,14 @@ class ServerHood {
         }  
       });
       reb.run().then(
-        result => {
+        async (result) => {
           reply.send(
             {
               message: "Запрос выполнен.", 
               remains: result
             }
           );
-          let state = JSON.parse(this.rfile("data/state.json"));
+          let state = JSON.parse(await this.rDataFile("data/state.json"));
           state[
             vigenere.cipher(
               true, 
@@ -438,11 +438,11 @@ class ServerHood {
       reply.send( {message: error.message} );
     }
   }
-  handleBotSending(req, rep) {
+  async handleBotSending(req, rep) {
     let today = chron.getYearMonthDate();
     let today_attempts_key = today + "_bot_sending_attempts";
     let body = JSON.parse(req.body);
-    let state = JSON.parse(this.rfile("data/state.json"));
+    let state = JSON.parse(await this.rDataFile("data/state.json"));
     state = this._cleanStateSibz.call(this, today, state)
     if (state.sibz[today_attempts_key] === undefined) {
         state.sibz[today_attempts_key] = 1;
@@ -483,9 +483,9 @@ class ServerHood {
       console.log(er.stack);
     }
   } 
-  handleOrderSaving(request, reply) {
+  async handleOrderSaving(request, reply) {
     let today = chron.getYearMonthDate();
-    let orders = JSON.parse(this.rfile('data/orders.json'));
+    let orders = JSON.parse(await this.rDataFile('data/orders.json'));
     orders = this.removeOldOrders(orders, today, 30);
     let body = JSON.parse(request.body);
     
@@ -543,101 +543,10 @@ class ServerHood {
     
     reply.send({message:'Сохранено.'});
   }
-  nextAccessibleOrderPlace(places) {
-    let keys = Object.keys(places);
-    let isKeysAbsent = true;
-    for (let k of keys) {
-      if (k.includes('(')) {
-        isKeysAbsent = false;
-        continue;
-      }
-    }
-    if (isKeysAbsent) {
-      return '(1)';
-    }
-    keys.sort();
-    return '(' + (+(keys.pop()[1]) + 1) + ')';
-  }
-  removeOldOrders(orders, today, days) {
-    let oldest = new Date(today).getTime() - (1000*86400*days); 
-    for (let k in orders) {
-      let kTime = new Date(k).getTime();
-      if (kTime < oldest) {
-        delete orders[k];
-      }
-    }
-    return orders; 
-  }
-  handleDatesAsking(request, reply) {
-    // let body = JSON.parse(request.body);
-    //  let isOkClient = (
-    //   body.login === process.env.CLIENT0 ||
-    //   body.login === process.env.CLIENT1 ||
-    //   body.login === process.env.CLIENT2 ||
-    //   body.login === process.env.SIHELOGIN
-    // );
-    // if (!isOkClient) {
-    //   reply.send({message:"Неверный логин или непредвиденная ошибка."});
-    //   return;
-    // }
-    let dates = this.collectOrderDates();
-    reply.send({
-      message:"Даты получены.",
-      dates
-    });
-    return;
-  }
-  collectOrderDates() {
-    let dates = [];
-    let orders = JSON.parse(this.rfile('data/orders.json'));
-    for (let k in orders) {
-      for (let k1 in orders[k]) {
-        for (let k2 in orders[k][k1]) {
-          dates.push([k, k1, k2, orders[k][k1][k2].note]);
-        }
-      }
-    }
-    return dates;
-  }
-  handleOrderAsking(request, reply) {
-    let body = JSON.parse(request.body);
-    let orders = JSON.parse(this.rfile('data/orders.json'));
-    let splitted = body.date;
-    let orderDated = orders[splitted[0]];
-    if (orderDated === undefined || !(Object.prototype.toString.call(orderDated[splitted[1]]).includes('Object')) || 
-       !(Object.prototype.toString.call(orderDated[splitted[1]][splitted[2]]).includes('Object'))) {
-      reply.send({message:"Введены неверные данные"});
-      return;
-    }
-    reply.send({
-      message:"Заказ получен.",
-      order: orderDated[ splitted[1] ][ splitted[2] ].order,
-      note: orderDated[ splitted[1] ][ splitted[2] ].note,
-    });
-  }
-  handleOrderDeling(request, reply) {
-    let body = JSON.parse(request.body);
-    let orders = JSON.parse(this.rfile('data/orders.json'));
-    let splitted = body.date;
-    let orderDated = orders[splitted[0]];
-    if (
-        orderDated === undefined || !(Object.prototype.toString.call(orderDated[splitted[1]]).includes('Object')) || 
-         !(Object.prototype.toString.call(orderDated[splitted[1]][splitted[2]]).includes('Object')) || 
-        body.password !== process.env.PASSWORD) {
-      
-      reply.send({message:"Введены неверные данные"});
-      return;
-    }
-    delete orderDated[splitted[1]][splitted[2]];
-    this.wfile('data/orders.json', JSON.stringify(orders, null, 4));
-    reply.send({
-      message:"Заказ удален.",
-    });
-  }
-  handleSihecaOne(request, reply) {
+  async handleSihecaOne(request, reply) {
     let today = chron.getYearMonthDate();
     let today_attempts_key = today + "_products_updating_attempts_one"; 
-    let state = JSON.parse(this.rfile("data/state.json"));
+    let state = JSON.parse(await this.rDataFile("data/state.json"));
     
     if (this.isSihecaWorkingNow) {
       reply.send({message: "alreadyWorking", lpud: state.sibz.last_products_updating_day});
@@ -716,6 +625,20 @@ class Server extends ServerHood {
     this.defineFastifyRoutes.call(this);
   }
   
+  async run () {
+    const state = await redis.get('data/state.json');
+    if (!state) {
+      await redis.set('data/state.json', `{
+        "sibz": {
+          "last_products_updating_day": "2020.02.02 - 02:02:02",
+        }
+      }`);
+      let staticProducts = this.rfile('static_products.txt')
+      await redis.set('data/partner_order_products.txt', staticProducts)
+    }
+    this.listen();
+  }
+
   async listen() {
     try {
       await fastify.listen(3000);
@@ -726,22 +649,21 @@ class Server extends ServerHood {
   }
   
   defineFastifyRoutes() {
-    fastify.get('/state', (req, rep) => rep.raw.end(this.rfile('data/state.json')));
-    // fastify.get('/ordersjson', (req, rep) => rep.raw.end(this.rfile('data/orders.json')));
+    // fastify.get('/state', (req, rep) => rep.raw.end(this.rDataFile('data/state.json')));
     fastify.get('/updateProd', this.handleSihecaOne.bind(this));
     fastify.get('/', this.get.bind(this));
-    fastify.get('/orders.html', this.getFrontendFile.bind(this));
-    fastify.get('/orders2.html', this.getFrontendFile.bind(this));
-    fastify.get('/partner_order.html', this.getFrontendFile.bind(this));
+    // fastify.get('/orders.html', this.getFrontendFile.bind(this));
+    // fastify.get('/orders2.html', this.getFrontendFile.bind(this));
+    // fastify.get('/partner_order.html', this.getFrontendFile.bind(this));
     fastify.get('/clear_local_storage.html', this.getFrontendFile.bind(this));
     // fastify.get('/public_order.html', this.getFrontendFile.bind(this));
     fastify.get('/partner_order2.html', this.getFrontendFile.bind(this));
-    fastify.get('/calc.html', this.getFrontendFile.bind(this));
-    fastify.get('/partner_order.js', this.getFrontendFile.bind(this));
+    // fastify.get('/calc.html', this.getFrontendFile.bind(this));
+    // fastify.get('/partner_order.js', this.getFrontendFile.bind(this));
     // fastify.get('/public_order.js', this.getFrontendFile.bind(this));
     fastify.get('/partner_order2.js', this.getFrontendFile.bind(this));
     fastify.get('/products.html', this.getFrontendFile.bind(this));
-    fastify.get('/partner_order.css', this.getFrontendFile.bind(this));
+    // fastify.get('/partner_order.css', this.getFrontendFile.bind(this));
     // fastify.get('/public_order.css', this.getFrontendFile.bind(this));
     fastify.get('/partner_order2.css', this.getFrontendFile.bind(this));
     fastify.get('/scripts.html', this.getFrontendFile.bind(this));
@@ -751,40 +673,33 @@ class Server extends ServerHood {
     fastify.post('/remains', this.handleRebyanco.bind(this));
     // fastify.post('/product_movement', this.handleProductMovement.bind(this));
     fastify.post('/saveOrder', this.handleOrderSaving.bind(this));
-    fastify.post('/askDates', this.handleDatesAsking.bind(this));
-    fastify.post('/askOrder', this.handleOrderAsking.bind(this));
-    fastify.post('/delOrder', this.handleOrderDeling.bind(this));
+    // fastify.post('/askDates', this.handleDatesAsking.bind(this));
+    // fastify.post('/askOrder', this.handleOrderAsking.bind(this));
+    // fastify.post('/delOrder', this.handleOrderDeling.bind(this));
     
-    fastify.get(
-      '/partner_order_products.js', 
-      this.rawEnd.bind(
-        this,
-        this.cookDataScriptByPath.bind(
-          this,
-          "data/partner_order_products.txt",
-          "var",
-          "generated_products_string"
+    fastify.get('/partner_order_products.js', async (request, reply) => {
+      reply.raw.end(
+        await this.cookDataScriptByPath.call(
+          this, "data/partner_order_products.txt",
+          "var", "generated_products_string"
         )
       )
-    );
-    
-    fastify.get(
-      '/partner_order_info.js', 
-      this.rawEnd.bind(
-        this,
-        this.cookDataScript.bind(
+    });
+
+    fastify.get('/partner_order_info.js', async (request, reply) => {
+      reply.raw.end(
+        await this.cookDataScript.call(
           this,
           this.cookPartnerOrderInfo.bind(this),
           "var",
           "last_products_updating_day"
         )
       )
-    );
+    });
     
   }
   
 }
 
 const server = new Server;
-
-server.listen();
+server.run();
