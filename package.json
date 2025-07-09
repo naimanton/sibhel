@@ -1,9 +1,9 @@
 {
-  "name": "siwe",
+  "name": "sibhel",
   "version": "1.0.0",
-  "description": "siwe",
+  "description": "sibhel",
   "main": "server.js",
-  "repository": "https://github.com/naimanton/siwe",
+  "repository": "https://github.com/naimanton/sibhel",
   "author": "",
   "license": "MIT",
   "private": false,
@@ -14,6 +14,6 @@
   
   },
   "engines": {
-    "node": ">=14"
+    "node": ">=20"
   }
 }
