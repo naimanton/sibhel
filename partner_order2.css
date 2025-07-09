@@ -1,0 +1,65 @@
+body {
+/*   background-color:	#b6d7a8; */
+  background-color:	#99cccc;
+  margin: 0px;
+}
+select {
+  padding: 15px;
+}
+textarea {
+  padding: 15px;
+}
+input {
+  padding: 15px;
+  transition: background 0.1s;
+}
+table {
+  font-family: "Lucida Sans Unicode", "Lucida Grande", Sans-Serif;
+  max-width: 1200px;
+  color: #686461;
+  margin: auto;
+}
+td {
+  padding: 10px;
+}
+a {
+  color: #3388cc;
+}
+a:visited {
+  color: #3388cc;
+}
+
+#copy-textarea {
+  height: 0px;
+  width: 0px;
+}
+#order-table tr {
+  background-color: white;
+}
+#discount-input {
+  width: 30px;
+}
+#tbody-sticky {
+  position: sticky;
+  top: 0px;
+}
+#mothersite-search-input {
+  width: 420px;
+}
+#noteTextarea {
+  width: 205px;
+}
+#price-sum:hover {
+  opacity: 0.8;
+}
+.product-info-tr:hover {
+  color: black;
+  opacity: 0.9;
+}
+.amount-input {
+  width: 30px;
+}
+/*       #message-div {
+  position: sticky;
+  top: 20px;
+} */
