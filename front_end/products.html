@@ -1,0 +1,224 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Каталог</title>
+    <meta charset="utf8">
+    <link href="partner_order.css" rel="stylesheet">
+    <link 
+        id="favicon" 
+        rel="icon" 
+        href="https://cdn.glitch.global/a3684bc5-4628-411e-86a7-63fef2606aa3/shfavicon.ico?v=1656348357438"
+        type="image/x-icon"
+      >
+    <style>
+      #search_results tr {
+        background-color: #f8f5f0;
+      }
+      #search_input {
+        display: block;
+        padding: 10px 15px;
+        margin: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <input id="search_input" placeholder="Поиск">
+    <table id="search_results">
+    </table>
+    <br>
+    <br>
+    <br>
+    <br>
+    <br>
+    <script src="/partner_order_products.js" ></script>
+    <script>
+    class ProductAPI {
+      constructor() {
+        let products_string = window["generated_products_string"];
+        let compared = this._handleProductsStringsComparing.call(
+          this,
+          products_string,
+          products_string,
+        );
+        compared.sort( (a,b) => {
+          let aspl = a.line.split('\t');
+          let bspl = b.line.split('\t');
+          
+          
+        });
+        let table = this._comparingResultToTable.call(
+          this,
+          compared,
+          "products"
+        );
+        document.body.insertAdjacentHTML("beforeend", table); 
+        this.products_collection = document.querySelector("tbody").children;
+        
+        search_input.addEventListener("input", (e) => {
+          this._handleSearch(e.target.value)
+        });
+      }
+      _handleProductsStringsComparing(old_str, new_str) {
+        let t = "\t", n = "\n";
+        let old_splitted = old_str.split(n);
+        let new_splitted = new_str.split(n);
+        let new_splitted_read_only = new_splitted.slice();
+        let new_splitted_codes = new_splitted.map( (item) => item.split(t)[0] );
+        let products = {
+          new_: [],
+          same: [],
+          changed: [],
+          deleted: []
+        };
+        for (let line of old_splitted) {
+          if (new_splitted.includes(line)) {
+            products.same.push({line, status: "same"});
+            new_splitted.splice(
+              new_splitted.indexOf(line),
+              1
+            );
+            continue;
+          }
+          let line_splitted = line.split(t);
+          if (new_splitted_codes.includes(line_splitted[0])) {
+            let index = new_splitted_codes.indexOf(line_splitted[0]);
+            products.changed.push({
+              line: new_splitted_read_only[index], 
+              status: "changed"
+            })
+            products.changed.push({line, status: "old"});
+            new_splitted.splice(
+              new_splitted.indexOf(new_splitted_read_only[index]), 1
+            );
+            continue;
+          } 
+          products.deleted.push({line, status: "deleted"});
+        }
+        new_splitted.forEach(
+          (item) => products.new_.push({line: item, status: "new"})
+        );
+        return [].concat(
+          products.new_,
+          products.changed,
+          products.deleted,
+          products.same
+        );
+      }
+      _comparingResultToTable(compared, table_id) {
+        let html = `
+        <table id="${table_id}">
+            <tr class="comparing-same-tr">
+              <td>№</td>
+              <td>Код</td>
+              <td>Наименование</td>
+              <td>Баллы</td>
+              <td>Стоимость</td>
+            </tr>
+        `;
+        let i = 0;
+        for (let row of compared) {
+          let line_splitted = row.line.split("\t");
+          if (line_splitted[0] === "") continue;
+          let id;
+          if (!["deleted", "old"].includes(row.status)) {
+            i++;
+            id = i;
+          }
+          else {
+            id = "";
+          }
+          html += `
+            <tr class="comparing-${row.status}-tr">
+              <td>${id}</td>
+              <td>${line_splitted[0]}</td>
+              <td>${line_splitted[1]}</td>
+              <td>${line_splitted[2]}</td>
+              <td>${line_splitted[3]}</td>
+            </tr>
+          `;
+        }
+        html += "</table>";
+        return html;
+      }
+      _correctLanguage(string) {
+        let result = "";
+        let scheme = {
+          "q": "й",
+          "w": "ц",
+          "e": "у",
+          "r": "к",
+          "t": "е",
+          "y": "н",
+          "u": "г",
+          "i": "ш",
+          "o": "щ",
+          "p": "з",
+          "[": "х",
+          "]": "ъ",
+          "a": "ф",
+          "s": "ы",
+          "d": "в",
+          "f": "а",
+          "g": "п",
+          "h": "р",
+          "j": "о",
+          "k": "л",
+          "l": "д",
+          ";": "ж",
+          "'": "э",
+          "z": "я",
+          "x": "ч",
+          "c": "с",
+          "v": "м",
+          "b": "и",
+          "n": "т",
+          "m": "ь",
+          ",": "б",
+          ".": "ю",
+        }
+        for (let sym of string) {
+          result += scheme[sym];
+        }
+        return result;
+      }
+      _handleSearch(query) {
+        for (let tr of document.querySelectorAll("#search_results tr")) {
+          tr.remove();
+        }
+        if (query.length === 0) return;
+        let search_col;
+        if ( isNaN(+query[0]) ) {
+          search_col = 2;
+        }
+        else {
+          search_col = 1;
+        }
+        
+        let result = [ this.products_collection[0] ].concat(
+          [...this.products_collection].filter( (item) => {
+            return item.children[search_col].innerText.toLowerCase().includes( query.toLowerCase() );
+          })
+        );
+        
+        if (result.length < 2) {
+          let corrected = this._correctLanguage(query.toLowerCase());
+          result = [ this.products_collection[0] ].concat(
+          [...this.products_collection].filter( (item) => {
+            return item.children[search_col].innerText.toLowerCase().includes( corrected );
+          })
+        );
+        }
+        
+        for (let tr of result) {
+          search_results.append(tr.cloneNode(true))
+        }
+      }
+    }
+      
+    let p = new ProductAPI;
+      
+    
+    </script>
+    
+  </body>
+</html>

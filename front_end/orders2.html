@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>База заказов v2</title>
+  <link 
+        id="favicon" 
+        rel="icon" 
+        href="https://cdn.glitch.global/a3684bc5-4628-411e-86a7-63fef2606aa3/shfavicon.ico?v=1656348357438"
+        type="image/x-icon"
+      >
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      max-width: 900px;
+      margin: auto;
+      background-color: #fae5be;
+    }
+    section {
+      margin-bottom: 30px;
+    }
+    label {
+      display: block;
+      margin: 10px 0 5px;
+    }
+    input, select, textarea, button {
+      width: 100%;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+    td {
+      padding: 15px;
+    }
+    .infospan {
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. Фильтр -->
+  <section id="filter">
+    <h2>Фильтр</h2>
+    <label for="date-from">Дата с:</label>
+    <input type="date" id="dateFilterInp1" />
+
+    <label for="date-to">Дата до:</label>
+    <input type="date" id="dateFilterInp2" />
+
+    <label for="warehouse-number">Номер склада:</label>
+    <input type="text" id="storeFilterInp" />
+    <input id="filterSub" type="submit" value="Фильтровать">
+  </section>
+
+  <!-- 2. Выбор заказа -->
+  <section id="order-selection">
+    <h2>Выбор заказа</h2>
+    <label for="order-select">Выберите заказ:</label>
+    <span class="infospan" id="filterInfo"></span>
+    <select id="datesSelect">
+    </select>
+
+    <button type="button" id="askOrder">Запросить заказ</button>
+    <textarea placeholder="Здесь появится выбранный заказ" id="resultTextarea"></textarea>
+  </section>
+
+  <!-- 3. Удаление заказа -->
+  <section id="order-deletion">
+    <h2>Удаление заказа</h2>
+    <label for="delete-password">Введите пароль:</label>
+    <input type="password" id="password"/>
+    <button type="button" id="delOrder">Удалить заказ</button>
+  </section>
+  
+  <section>
+    <h2>Отображение заказа</h2>
+    <span class="infospan" id="orderInfoSpan"></span>
+    <table>
+      <tbody id="orderTbody"></tbody>
+    </table>
+  </section>
+  <script>
+    var jstr = JSON.stringify;
+      var outputDates = [];
+      let s = '---';
+      var app = {
+        try(callback) {
+          try { callback() }
+          catch (er) { alert(er); console.log(er.stack) }
+        },
+        a(boolean, msg='Foreseen error') {
+          if (boolean) return;
+          throw new Error(msg);
+        },
+        run() {
+          askOrder.addEventListener('click', () => {
+              if (!datesSelect.value.includes(s)) {
+                alert('Выберите дату');
+                return;
+              }
+              let spl = datesSelect.value.split(s)
+              app.postFetchObject(
+                '/askOrder', 
+                { date: spl },
+                response => app.handleOrder(response, datesSelect.value)
+              );
+          });
+          
+           delOrder.addEventListener('click', () => {
+              if (!datesSelect.value.includes(s)) {
+                alert('Выберите дату');
+                return;
+              }
+              if (password.value === '') {
+                alert('Введите пароль.');
+                return;
+              }
+              if(!confirm('Удалить заказ?')) return;
+              alert('Запрос...');
+              app.postFetchObject(
+                '/delOrder', 
+                {password: password.value, date: datesSelect.value.split(s)},
+                app.handleOrder
+              );
+          });
+          filterSub.addEventListener('click', () => {
+            datesSelect.innerHTML = '';
+            let datesHTML = '';
+            filterInfo.innerText = `Фильтр: ${storeFilterInp.value || 'Любой склад'}; ${dateFilterInp1.value || '---'} - ${dateFilterInp2.value || '---'}`;
+            for (let date of outputDates) {
+              let dateSpl = date.split(s);
+                if (
+                  !app.dateBetween(dateSpl[0], dateFilterInp1.value, dateFilterInp2.value) ||
+                  !(dateSpl[1].includes(storeFilterInp.value))
+                ) continue; 
+                datesHTML += `<option value="${date}">${date}</option>`
+            }
+            datesSelect.insertAdjacentHTML('beforeend', datesHTML);
+            return;
+            });
+          app.postFetchObject(
+            '/askDates', 
+            {},
+            app.handleDates
+          );
+        },
+        dateBetween(date1, date0, date2) {
+          if (date0 === '' && date2 === '') return true;
+          if (date0 === '') {
+            date0 = date2;
+          }
+          if (date2 === '') {
+            date2 = date0;
+          }
+          var ldate0 = date0;
+          var ldate2 = date2;
+          if (date0 > date2) {
+            var tdate0 = ldate0;
+            ldate0 = ldate2
+            ldate2 = tdate0;
+          }
+          if (new Date(date1) >= new Date(ldate0) && new Date(date1) <= new Date(ldate2)) return true;
+          return false;
+        },
+        postFetchObject(url, request, callback) {
+          let config = {
+            method: 'POST',
+            body: JSON.stringify(request)
+          }
+          fetch(url, config).then(p => p.text().then( r => callback(r) ));
+        },
+        handleDates(response) {
+          let r = JSON.parse(response);
+          let datesHTML = '';
+
+          if (r.message !== 'Даты получены.') {
+            alert(r.message);
+            return;
+          }
+          // r.dates.sort().reverse()
+          for (let date of r.dates) {
+            outputDates.push(
+                date[0]+s+date[1]+s+date[2]+(date[3] ? s+date[3] : '')
+            );
+          }
+          outputDates.sort().reverse();
+          for (let date of outputDates) {
+            datesHTML += `<option value="${date}">${date}</option>`
+          }
+          datesSelect.insertAdjacentHTML('beforeend', datesHTML);
+        },
+        handleOrder(response, orderInfo) {
+          let r = JSON.parse(response);
+          let orderHTML = '';
+          if (r.message !== 'Заказ получен.') {
+            alert(r.message);
+            return;
+          }
+          resultTextarea.value = r.order;
+          orderInfoSpan.innerText = "Отображается: " + orderInfo;
+          for (let pos of r.order.split('\n')) {
+            let sp = pos.split('\t');
+            orderHTML += `
+              <tr>
+                <td>${sp[0]}</td>
+                <td>${sp[1]}</td>
+                <td>${sp[2]}</td>
+                <td>${sp[3]}</td>
+                <td>${sp[4]}</td>
+              </tr>
+            `;
+          }
+          orderTbody.innerHTML = orderHTML;
+        },
+        convertOrderToObject(order) {
+          var result = {};
+          var orderSpl = order.split('\n');
+          for (var line of orderSpl) {
+            var lineSpl = line.split('\t');
+            if (["Код","Итог:"].includes(lineSpl[0])) continue;
+            if (result[lineSpl[0]] === undefined) {
+              result[lineSpl[0]] = {
+                name: lineSpl[1],
+                amount: +lineSpl[2],
+                coins: lineSpl[3],
+                price: lineSpl[4]
+              };
+              continue;
+            }
+            result[lineSpl[0]].amount += +lineSpl[2];            
+          }
+          return result;
+        },
+        convertObjectToOrder(object) {
+          var result = 'Код\tНаименование\tКол-во\tБаллы\tЦена\n';
+          var sum = {amount:0, coins:0, price:0};
+          for (var code in object) {
+            sum.amount += +object[code].amount;
+            sum.coins += +object[code].coins * +object[code].amount;
+            sum.price += +object[code].price * +object[code].amount;
+            result += `${code}\t${object[code].name}\t${object[code].amount}\t${object[code].coins}\t${object[code].price}\n`
+          }
+          result += `Итог:\t\t${sum.amount}\t${sum.coins}\t${sum.price}`;
+          return result;
+        },
+      };
+      
+      app.run();
+  </script>
+</body>
+</html>
