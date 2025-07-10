@@ -847,11 +847,7 @@ class Server extends ServerHood {
   async run () {
     const state = await redis.get('data/state.json');
     if (!state) {
-      await redis.set('data/state.json', `{
-        "sibz": {
-          "last_products_updating_day": "2020.02.02 - 02:02:02",
-        }
-      }`);
+      await redis.set('data/state.json', `{"sibz": {"last_products_updating_day": "2020.02.02 - 02:02:02"}}`);
       let staticProducts = this.rfile('static_products.txt')
       await redis.set('data/partner_order_products.txt', staticProducts)
     }
