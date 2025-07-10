@@ -376,7 +376,7 @@ class ServerHood {
   }
   
   async cookPartnerOrderInfo() {
-    const stateJSON = await this.rDatafile.call(this, 'data/state.json');
+    const stateJSON = await this.rDataFile.call(this, 'data/state.json');
     const state = JSON.parse(stateJSON);
     return state.sibz.last_products_updating_day;
   }
