@@ -1,12 +1,12 @@
 // polyfills
 if (!String.prototype.replaceAll) {
-	String.prototype.replaceAll = function(str, newStr){
-		if (Object.prototype.toString.call(str).toLowerCase() === '[object regexp]') {
-			return this.replace(str, newStr);
-		}
-		return this.replace(new RegExp(str, 'g'), newStr);
+  String.prototype.replaceAll = function(str, newStr){
+    if (Object.prototype.toString.call(str).toLowerCase() === '[object regexp]') {
+      return this.replace(str, newStr);
+    }
+    return this.replace(new RegExp(str, 'g'), newStr);
 
-	};   
+  };   
 } 
 
 const qw = console.log;
@@ -817,12 +817,12 @@ class ServerHood {
           this.isSihecaWorkingNow = false;
           let time = chron.formatted();
           state.sibz.last_products_updating_day = time;
-        	this.wfile("data/partner_order_products.txt", result);
-          	this.wfile(
-        		"data/state.json", 
-        		JSON.stringify(state, false, 4)
-      		);
-      		reply.send({message: 'OK', lpud: time});
+          this.wfile("data/partner_order_products.txt", result);
+            this.wfile(
+            "data/state.json", 
+            JSON.stringify(state, false, 4)
+          );
+          reply.send({message: 'OK', lpud: time});
         },
         error => {
           this.isSihecaWorkingNow = false;
@@ -869,43 +869,43 @@ class Server extends ServerHood {
   
   defineFastifyRoutes() {
     // fastify.get('/state', (req, rep) => rep.raw.end(this.rDataFile('data/state.json')));
-    fastify.get('/updateProd', this.handleSihecaOne.bind(this));
-    fastify.get('/', this.get.bind(this));
+    fastify.get('/updateProd', attempt.bind(this, this.handleSihecaOne.bind(this)));
+    fastify.get('/', attempt.bind(this, this.get.bind(this)));
     // fastify.get('/orders.html', this.getFrontendFile.bind(this));
     // fastify.get('/orders2.html', this.getFrontendFile.bind(this));
     // fastify.get('/partner_order.html', this.getFrontendFile.bind(this));
-    fastify.get('/clear_local_storage.html', this.getFrontendFile.bind(this));
+    fastify.get('/clear_local_storage.html', attempt.bind(this, this.getFrontendFile.bind(this)));
     // fastify.get('/public_order.html', this.getFrontendFile.bind(this));
-    fastify.get('/partner_order2.html', this.getFrontendFile.bind(this));
+    fastify.get('/partner_order2.html', attempt.bind(this, this.getFrontendFile.bind(this)));
     // fastify.get('/calc.html', this.getFrontendFile.bind(this));
     // fastify.get('/partner_order.js', this.getFrontendFile.bind(this));
     // fastify.get('/public_order.js', this.getFrontendFile.bind(this));
-    fastify.get('/partner_order2.js', this.getFrontendFile.bind(this));
-    fastify.get('/products.html', this.getFrontendFile.bind(this));
+    fastify.get('/partner_order2.js', attempt.bind(this, this.getFrontendFile.bind(this)));
+    fastify.get('/products.html', attempt.bind(this, this.getFrontendFile.bind(this)));
     // fastify.get('/partner_order.css', this.getFrontendFile.bind(this));
     // fastify.get('/public_order.css', this.getFrontendFile.bind(this));
-    fastify.get('/partner_order2.css', this.getFrontendFile.bind(this));
-    fastify.get('/scripts.html', this.getFrontendFile.bind(this));
-    fastify.post('/update_products_string', this.handleSibzPartnerOrderProductsUpdating.bind(this));
-    fastify.post('/siheca', this.handleSiheca.bind(this));
-    fastify.post('/siheca2', this.handleSiheca2.bind(this));
+    fastify.get('/partner_order2.css', attempt.bind(this, this.getFrontendFile.bind(this)));
+    fastify.get('/scripts.html', attempt.bind(this, this.getFrontendFile.bind(this)));
+    fastify.post('/update_products_string', attempt.bind(this, this.handleSibzPartnerOrderProductsUpdating.bind(this)));
+    fastify.post('/siheca', attempt.bind(this, this.handleSiheca.bind(this)));
+    fastify.post('/siheca2', attempt.bind(this, this.handleSiheca2.bind(this)));
     // fastify.post('/remains', this.handleRebyanco.bind(this));
     // fastify.post('/product_movement', this.handleProductMovement.bind(this));
-    fastify.post('/saveOrder', this.handleBotSending.bind(this));
+    fastify.post('/saveOrder', attempt.bind(this, this.handleBotSending.bind(this)));
     // fastify.post('/askDates', this.handleDatesAsking.bind(this));
     // fastify.post('/askOrder', this.handleOrderAsking.bind(this));
     // fastify.post('/delOrder', this.handleOrderDeling.bind(this));
     
-    fastify.get('/partner_order_products.js', async (request, reply) => {
+    fastify.get('/partner_order_products.js', attempt.bind(this, async (request, reply) => {
       reply.raw.end(
         await this.cookDataScriptByPath.call(
           this, "data/partner_order_products.txt",
           "var", "generated_products_string"
         )
       )
-    });
+    }));
 
-    fastify.get('/partner_order_info.js', async (request, reply) => {
+    fastify.get('/partner_order_info.js', attempt.bind(this, async (request, reply) => {
       reply.raw.end(
         await this.cookDataScript.call(
           this,
@@ -914,10 +914,17 @@ class Server extends ServerHood {
           "last_products_updating_day"
         )
       )
-    });
+    }));
     
   }
   
+}
+
+async function attempt(callback, ...args) {
+  try { await callback(...args) }
+  catch (error) {
+    console.log(error.stack);
+  }
 }
 
 const server = new Server;
